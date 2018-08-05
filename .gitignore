@@ -1,0 +1,13 @@
+# Node
+node_modules
+
+# IntelliJ IDEA
+.idea
+*.iml
+
+# Mac stuff
+.DS_Store
+
+# Emacs stuff
+*.elc
+*~
