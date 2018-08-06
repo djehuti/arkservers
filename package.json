@@ -1,6 +1,6 @@
 {
   "name": "arkservers",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Node module for getting information from Ark: Survival Evolved game servers",
   "main": "arkservers.js",
   "author": "Ben Cox <cox@djehuti.com>",

@@ -93,7 +93,7 @@ function fetchUri(baseUri, apiUri) {
 
 /**
  * Function to return a function that returns a cached value (or null, if the cache isn't ready
- * yet for the given URI.
+ * yet) for the given URI.
  *
  * @param {string} baseUri The base URI for the Ark server info service.
  * @param {string} apiUri  The URI for the specific API being called.
@@ -176,7 +176,7 @@ arkservers.getCachedStatus = function getCachedStatus() {
 /**
  * Get the current ARK server network news.
  * @returns {Promise} A Promise that resolves to a server news string, which may
- *                    be in ArkML format.
+ *                    be in {@link https://ark.gamepedia.com/ArkML|ArkML format}.
  */
 arkservers.getNews = function getNews() {
   return fetchUri(arkservers.BASE_URI, arkservers.NEWS_URI);
@@ -184,7 +184,7 @@ arkservers.getNews = function getNews() {
 
 /**
  * Get the cached version of the ARK server network news.
- * @returns {string} The server news string, which may be in ARkML format, or null if
+ * @returns {string} The server news string, which may be in ArkML format, or null if
  *                   the cache is not ready.
  * @see getNews
  */
