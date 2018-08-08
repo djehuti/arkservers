@@ -201,10 +201,10 @@ arkservers.getCachedNews();
 
 /**
  * Get the current list of available ARK servers.
- * @returns {Promise} A Promise that resolves to a list of server info objects,
- *                    as resolved by the Promises returned by `Gamedig.query()`.
+ * @returns {Promise} A Promise that resolves to a list of Promises that resolve to
+ *                    server info objects, as returned by `Gamedig.query()`.
  */
-arkservers.getServerList = function getServerList() {
+arkservers.getServerPromises = function getServerPromises() {
   return fetchUri(arkservers.BASE_URI, arkservers.SERVER_LIST_URI).then((serverList) => {
     const serverIPs = serverList.split(/\r?\n/).map(line => line.split(/\s+/)[0]);
     const serverQueries = serverIPs.map(serverIP => arkservers.PORT_LIST.map(port => ({
@@ -215,13 +215,26 @@ arkservers.getServerList = function getServerList() {
       maxAttempts: arkservers.MAX_SERVER_ATTEMPTS,
       socketTimeout: arkservers.QUERY_SOCKET_TIMEOUT,
     }))).reduce((acc, val) => acc.concat(val));
-    const serverPromises = serverQueries.map(query => Gamedig.query(query).catch(() => null));
-    return co(function* parallelizer() {
-      const resolved = yield serverPromises;
-      return resolved.filter(val => val !== null);
-    });
+    return serverQueries.map(query => Gamedig.query(query));
   });
 };
 
+
+/* eslint comma-dangle: 0 */
+/**
+ * Get the current list of available ARK servers.
+ * @returns {Promise} A Promise that resolves to a list of server info objects,
+ *                    as resolved by the Promises returned by `Gamedig.query()`.
+ */
+arkservers.getServerList = function getServerList() {
+  return arkservers.getServerPromises().then(
+    serverPromises => serverPromises.map(qpromise => qpromise.catch(() => null))
+  ).then(
+    nullablePromises => co(function* parallelizer() {
+      const resolved = yield nullablePromises;
+      return resolved.filter(val => val !== null);
+    })
+  );
+};
 
 module.exports = arkservers;
