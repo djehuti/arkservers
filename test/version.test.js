@@ -26,9 +26,6 @@
 const assert = require('assert');
 const arkservers = require('../arkservers.js');
 
-/** @namespace describe */
-/** @namespace it */
-
 // TODO(bcox): This is a terrible test.
 describe('arkservers', () => {
   describe('#getCachedVersion()', () => {
@@ -39,7 +36,7 @@ describe('arkservers', () => {
       } else {
         setTimeout(() => {
           v = arkservers.getCachedVersion();
-          assert.notEqual(v, null, 'expected value after 1/2 second');
+          assert.notStrictEqual(v, null, 'expected value after 1/2 second');
           done();
         }, 500);
       }

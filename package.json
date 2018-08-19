@@ -1,6 +1,6 @@
 {
   "name": "arkservers",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A Node module for getting information from Ark: Survival Evolved game servers",
   "main": "arkservers.js",
   "author": "Ben Cox <cox@djehuti.com>",
@@ -10,7 +10,6 @@
     "url": "https://github.com/djehuti/arkservers.git"
   },
   "dependencies": {
-    "co": "^4.6.0",
     "colors": "^1.3.1",
     "gamedig": "^1.0.46",
     "lodash": "^4.17.10",

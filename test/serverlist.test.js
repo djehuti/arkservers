@@ -26,15 +26,12 @@
 const assert = require('assert');
 const arkservers = require('../arkservers.js');
 
-/** @namespace describe */
-/** @namespace it */
-
 // TODO(bcox): This is a terrible test.
 describe('arkservers', () => {
   describe('#getServerList()', () => {
     it('should return some values eventually', (done) => {
       arkservers.getServerList().then((serverInfos) => {
-        assert.notEqual(serverInfos.length, 0, 'expected to get some server info');
+        assert.notStrictEqual(serverInfos.length, 0, 'expected to get some server info');
         done();
       }).catch((reason) => {
         done(reason);

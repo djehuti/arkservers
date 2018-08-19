@@ -23,34 +23,38 @@
  *
  */
 
-require('colors');
+const colors = require('colors/safe');
 const parseArgs = require('minimist');
 const arkservers = require('../arkservers.js');
 
 const argv = parseArgs(process.argv.slice(2));
-/** @namespace argv._ */
 
 const interestingServers = argv._.length ? argv._ : ['NA-PVE-Official-Aberration409'];
+
+const durationAsString = (seconds) => {
+  const minutes = parseInt(seconds / 60, 10);
+  const hours = parseInt(minutes / 60, 10);
+  const modMinutes = minutes % 60;
+  return `${hours}h${modMinutes}m`;
+};
 
 arkservers.getServerList().then((serverInfos) => {
   console.log(`Total ${serverInfos.length} servers found.`);
   let found = 0;
-  serverInfos.map((info) => {
-    // eslint-disable-next-line prefer-const
-    let [name, version] = info.name.split(' - ');
-    version = version.replace(/\(v([^}]+)\)/, (match, p1) => p1);
+  serverInfos.forEach((info) => {
+    const { name, version } = info;
     if (interestingServers.includes(name)) {
       found += 1;
-      console.log(`Server ${name.green}, running ${version.bold.white}; online players:`);
-      /** @namespace info.players */
-      info.players.map((player) => {
-        if (player.hasOwnProperty('name')) {
-          console.log(`  ${player.name.blue}`);
-        }
-        return null;
+      console.log(`Server ${colors.green(name)}, running ${colors.white(colors.bold(version))}`);
+      console.log(`  Map: ${colors.white(info.map)} (${info.mode}) - day ${info.dayNumber}`);
+      console.log(`  Max players: ${info.maxPlayers}`);
+      console.log(`  Currently online players (${info.players.length}):`);
+      info.players.forEach((player) => {
+        console.log(
+          `    ${colors.blue(player.steamName)}: on ${durationAsString(player.elapsedTime)}`,
+        );
       });
     }
-    return null;
   });
   if (found === 0) {
     console.log('No matching server(s) found.');

@@ -24,15 +24,9 @@
  */
 
 const _ = require('lodash');
-const co = require('co');
-const Gamedig = require('gamedig');
+const { query: gamedigQuery } = require('gamedig');
 const http = require('http');
-
-
-// Why can't IntelliJ IDEA figure these out itself?
-// (Answer: these modules must export those symbols in ways it doesn't detect.)
-/** @namespace _.memoize */
-/** @namespace Gamedig.query */
+const { ArkServerInfo } = require('./arkserverinfo.js');
 
 
 const arkservers = {
@@ -77,7 +71,6 @@ function fetchUri(baseUri, apiUri) {
   return new Promise((resolve, reject) => {
     const fullUri = baseUri + apiUri;
     http.get(fullUri, (res) => {
-      /** @namespace res.setEncoding */
       res.setEncoding('utf8');
       let rawData = '';
       res.on('data', (chunk) => {
@@ -141,8 +134,8 @@ arkservers.getVersion = function getVersion() {
 
 /**
  * Get the cached value of the latest ARK server version.
- * @returns {string} The cached value of the latest version string, or null if
- *                   the cache is not ready.
+ * @returns {?string} The cached value of the latest version string, or null if
+ *                    the cache is not ready.
  * @see getVersion
  */
 arkservers.getCachedVersion = function getCachedVersion() {
@@ -200,41 +193,107 @@ arkservers.getCachedNews();
 
 
 /**
- * Get the current list of available ARK servers.
- * @returns {Promise} A Promise that resolves to a list of Promises that resolve to
- *                    server info objects, as returned by `Gamedig.query()`.
+ * Form a Gamedig query for the given host/port.
+ * @param {string} host The server IP.
+ * @param {number} port The port number.
+ * @returns {{type: string, host: string, port: number, port_query: number,
+ * maxAttempts: number, socketTimeout: number}}
  */
-arkservers.getServerPromises = function getServerPromises() {
-  return fetchUri(arkservers.BASE_URI, arkservers.SERVER_LIST_URI).then((serverList) => {
-    const serverIPs = serverList.split(/\r?\n/).map(line => line.split(/\s+/)[0]);
-    const serverQueries = serverIPs.map(serverIP => arkservers.PORT_LIST.map(port => ({
-      type: arkservers.ARK_GAME_TYPE,
-      host: serverIP,
-      port,
-      port_query: port,
-      maxAttempts: arkservers.MAX_SERVER_ATTEMPTS,
-      socketTimeout: arkservers.QUERY_SOCKET_TIMEOUT,
-    }))).reduce((acc, val) => acc.concat(val));
-    return serverQueries.map(query => Gamedig.query(query));
-  });
-};
+const queryForHost = (host, port) => ({
+  type: arkservers.ARK_GAME_TYPE,
+  host,
+  port,
+  port_query: port,
+  maxAttempts: arkservers.MAX_SERVER_ATTEMPTS,
+  socketTimeout: arkservers.QUERY_SOCKET_TIMEOUT,
+});
 
 
-/* eslint comma-dangle: 0 */
 /**
  * Get the current list of available ARK servers.
- * @returns {Promise} A Promise that resolves to a list of server info objects,
- *                    as resolved by the Promises returned by `Gamedig.query()`.
+ * @param {?[string]} serverIPs List of server IPs to be queried (default: fetched from server).
+ * @param {?[number]} ports List of port numbers to be queried (default: arkservers.PORT_LIST).
+ * @returns {Promise<[Promise<ArkServerInfo>]>} A Promise that resolves to a list of Promises that
+ *                                              resolve to ArkServerInfo objects.
  */
-arkservers.getServerList = function getServerList() {
-  return arkservers.getServerPromises().then(
-    serverPromises => serverPromises.map(qpromise => qpromise.catch(() => null))
-  ).then(
-    nullablePromises => co(function* parallelizer() {
-      const resolved = yield nullablePromises;
-      return resolved.filter(val => val !== null);
-    })
-  );
+arkservers.getServerPromises = async function getServerPromises(serverIPs = null, ports = null) {
+  const useServerIPs = serverIPs || await (async () => {
+    const serverList = await fetchUri(arkservers.BASE_URI, arkservers.SERVER_LIST_URI);
+    return serverList.split(/\r?\n/).map(line => line.split(/\s+/)[0]);
+  })();
+  const serverQueries = useServerIPs.map(
+    serverIP => (ports || arkservers.PORT_LIST).map(
+      port => queryForHost(serverIP, port),
+    ),
+  ).reduce((acc, val) => acc.concat(val));
+  return serverQueries.map(query => gamedigQuery(query).then(
+    result => new ArkServerInfo(result),
+  ));
 };
+
+
+/**
+ * Get the current list of available ARK servers.
+ * @param {?[string]} serverIPs List of server IPs to be queried (default: fetched from server).
+ * @param {?[number]} ports List of port numbers to be queried (default: arkservers.PORT_LIST).
+ * @returns {Promise<[ArkServerInfo]>} A Promise that resolves to a list of server info objects.
+ */
+arkservers.getServerList = async function getServerList(serverIPs = null, ports = null) {
+  const serverPromises = await arkservers.getServerPromises(serverIPs, ports);
+  const nullablePromises = serverPromises.map(qpromise => qpromise.catch(() => null));
+  const resolved = await Promise.all(nullablePromises);
+  return resolved.filter(val => val !== null);
+};
+
+
+/**
+ * Get the query results for a single server, by name, optionally supplying an IP and/or port
+ * hint (where the server was last seen). If the hints are given, but the server is not found,
+ * and fallback is true, look through the full server list to find the server.
+ * @param {string} serverName
+ * @param {?string} host The IP the server was last seen on.
+ * @param {?number} port The port number the server was last seen on.
+ * @param {?boolean} fallback Whether to look at the full list if hints don't help (default: true).
+ * @returns {Promise<ArkServerInfo|null>} The server info, or null if the server can't be found.
+ */
+arkservers.getServerInfo = async function queryServer(
+  serverName,
+  { host = null, port = null, fallback = true } = {},
+) {
+  // First, try the IP/Port that was given in the hint.
+  // (This uses one or both hints, or neither.)
+  let resultList = (await arkservers.getServerList(
+    host ? [host] : null,
+    port ? [port] : null,
+  )).filter(
+    info => info.name === serverName,
+  );
+
+  // If the caller gave both hints, try using just the host hint.
+  // (If they just passed one hint, we tried that one above.)
+  if (resultList.length === 0 && fallback && !!host && !!port) {
+    resultList = (await arkservers.getServerList([host], null)).filter(
+      info => info.name === serverName,
+    );
+
+    // Still no luck. Maybe just try the port hint.
+    if (resultList.length === 0) {
+      resultList = (await arkservers.getServerList(null, [port])).filter(
+        info => info.name === serverName,
+      );
+    }
+  }
+
+  // If that didn't work (and the caller actually gave either hint), then go back and ask the
+  // Ark Server Info API host for a server list, and look among those. (This uses neither hint.)
+  if (resultList.length === 0 && fallback && (!!host || !!port)) {
+    resultList = (await arkservers.getServerList()).filter(
+      info => info.name === serverName,
+    );
+  }
+
+  return resultList.length > 0 ? resultList[0] : null;
+};
+
 
 module.exports = arkservers;
