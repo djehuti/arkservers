@@ -30,6 +30,13 @@ const arkservers = require('../arkservers.js');
 const argv = parseArgs(process.argv.slice(2));
 
 const interestingServers = argv._.length ? argv._ : ['NA-PVE-Official-Aberration409'];
+const useColor = argv.color === undefined ? true : argv.color;
+
+const identity = x => x;
+const green = useColor ? colors.green : identity;
+const white = useColor ? colors.white : identity;
+const bold = useColor ? colors.bold : identity;
+const blue = useColor ? colors.blue : identity;
 
 const durationAsString = (seconds) => {
   const minutes = parseInt(seconds / 60, 10);
@@ -45,13 +52,13 @@ arkservers.getServerList().then((serverInfos) => {
     const { name, version } = info;
     if (interestingServers.includes(name)) {
       found += 1;
-      console.log(`Server ${colors.green(name)}, running ${colors.white(colors.bold(version))}`);
-      console.log(`  Map: ${colors.white(info.map)} (${info.mode}) - day ${info.dayNumber}`);
+      console.log(`Server ${green(name)}, running ${white(bold(version))}`);
+      console.log(`  Map: ${white(info.map)} (${info.mode}) - day ${info.dayNumber}`);
       console.log(`  Max players: ${info.maxPlayers}`);
       console.log(`  Currently online players (${info.players.length}):`);
       info.players.forEach((player) => {
         console.log(
-          `    ${colors.blue(player.steamName)}: on ${durationAsString(player.elapsedTime)}`,
+          `    ${blue(player.steamName)}: on ${durationAsString(player.elapsedTime)}`,
         );
       });
     }
